@@ -195,7 +195,7 @@ if __name__ == '__main__':
     input_dir = Path(INPUT_DIR)
     nilearn_cache = ""
     args = get_parser().parse_args()
-    atlas_names = ATLAS_METADATA.keys() if args.atlas -1 else [args.atlas]
+    atlas_names = ATLAS_METADATA.keys() if args.atlas == -1 else [args.atlas]
     dataset = f"{args.dataset}_preprocess"
 
     print("#### {} ####".format(dataset))
