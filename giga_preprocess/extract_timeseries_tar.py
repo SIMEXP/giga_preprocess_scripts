@@ -44,7 +44,7 @@ ATLAS_METADATA = {
     'DiFuMo': {
         'type': "probseg",
         'parcels': [64, 128, 256, 512, 1024],
-        'description': "{parcels}dimensionsSegmented",
+        'description': "{parcel}dimensionsSegmented",
         'source': "data/raw/segmented_difumo_atlases/"},
 }
 
@@ -88,16 +88,17 @@ def create_atlas_masker(atlas_name, parcel, nilearn_cache=""):
     atlas_path = tflow.get('MNI152NLin2009cAsym',
                             atlas=atlas_name,
                             resolution=resolution,
-                            desc=desc)
+                            desc=desc,
+                            extension=".nii.gz")
 
     label_path = Path(str(atlas_path).replace("nii.gz", "tsv"))
 
     if curr_atlas['type'] == "dseg":
         masker = NiftiLabelsMasker(
-            atlas_path, detrend=True)
+            str(atlas_path), detrend=True)
     elif curr_atlas['type'] == "probseg":
         masker = NiftiMapsMasker(
-            label_path, detrend=True)
+            str(atlas_path), detrend=True)
     if nilearn_cache:
         masker = masker.set_params(memory=nilearn_cache, memory_level=1)
 
@@ -220,10 +221,11 @@ if __name__ == '__main__':
             mask_img = compute_brain_mask(fmri_nii, memory=nilearn_cache)
 
             for parcel in ATLAS_METADATA[atlas_name]['parcels']:
+                print("\t" + parcel)
                 masker, label_path = create_atlas_masker(atlas_name, parcel, nilearn_cache)
                 output_filename_root = bidsish_timeseries_file_name(
                     file_entitiles)
-                atlas_desc = label_path.split('desc-')[-1].split('_')[0]
+                atlas_desc = label_path.name.split('desc-')[-1].split('_')[0]
 
                 masker.set_params(mask_img=mask_img)
                 raw_tseries = masker.fit_transform(
