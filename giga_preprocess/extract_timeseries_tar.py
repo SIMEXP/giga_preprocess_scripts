@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
+from nilearn.image import load_img
 from nilearn.maskers import NiftiLabelsMasker, NiftiMapsMasker
 from nilearn.masking import compute_brain_mask
 from templateflow import api as tflow
@@ -215,6 +216,7 @@ if __name__ == '__main__':
                 continue
             timeseries_output_dir = create_timeseries_root_dir(output_dir,
                 file_entitiles)
+            fmri_nii = load_img(fmri_path)
             mask_img = compute_brain_mask(fmri_path, memory=nilearn_cache)
 
             for parcel in ATLAS_METADATA[atlas_name]['parcels']:
