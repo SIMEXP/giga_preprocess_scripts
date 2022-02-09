@@ -217,7 +217,7 @@ if __name__ == '__main__':
             timeseries_output_dir = create_timeseries_root_dir(output_dir,
                 file_entitiles)
             fmri_nii = load_img(fmri_path)
-            mask_img = compute_brain_mask(fmri_path, memory=nilearn_cache)
+            mask_img = compute_brain_mask(fmri_nii, memory=nilearn_cache)
 
             for parcel in ATLAS_METADATA[atlas_name]['parcels']:
                 masker, label_path = create_atlas_masker(atlas_name, parcel, nilearn_cache)
