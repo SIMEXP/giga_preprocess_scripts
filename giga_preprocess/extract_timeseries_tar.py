@@ -35,19 +35,37 @@ NIAK_CONFOUNDS = ["motion_tx", "motion_ty", "motion_tz",
                   "wm_avg", "vent_avg", "slow_drift"]
 
 ATLAS_METADATA = {
-    'Schaefer2018': {
-        'type': "dseg",
-        'parcels': [100, 200, 300, 400, 500, 600, 800, 1000],
-        'description': "{parcel}Parcels7Networks",
-        'source': "templateflow"
+    'schaefer7': {
+        'source': "templateflow",
+        'templates' : ['MNI152NLin2009cAsym', 'MNI152NLin6Asym'],
+        'resolutions': [1, 2],
+        'atlas': 'Schaefer2018',
+        'description_pattern': "{dimension}Parcels7Networks",
+        'dimensions': [100, 200, 300, 400, 500, 600, 800, 1000],
+        'atlas_parameters': ['resolution', 'desc'],
+        'label_parameters': ['desc'],
         },
-    'DiFuMo': {
-        'type': "probseg",
-        'parcels': [64, 128, 256, 512, 1024],
-        'description': "{parcel}dimensionsSegmented",
-        'source': "data/raw/segmented_difumo_atlases/"},
-}
-
+    'difumo': {
+        'source': "templateflow",
+        'templates' : ['MNI152NLin2009cAsym', 'MNI152NLin6Asym'],
+        'resolutions': [2, 3],
+        'atlas': 'DifuMo',
+        'description_pattern': "{dimension}dimensions",
+        'dimensions': [64, 128, 256, 512, 1024],
+        'atlas_parameters': ['resolution', 'desc'],
+        'label_parameters': ['resolution','desc'],
+        },
+    "segmented_difumo": {
+        'source': "user_define",
+        'templates' : ['MNI152NLin2009cAsym'],
+        'resolutions': [2, 3],
+        'atlas': 'DifuMo',
+        'description_pattern': "{dimension}dimensionsSegmented",
+        'dimensions': [64, 128, 256, 512, 1024],
+        'atlas_parameters': ['resolution', 'desc'],
+        'label_parameters': ['resolution','desc'],
+        },
+    }
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -67,42 +85,127 @@ def get_parser():
     return parser
 
 
-def create_atlas_masker(atlas_name, parcel, nilearn_cache=""):
-    """Create masker of all number of parcel given metadata."""
-    if atlas_name not in ATLAS_METADATA.keys():
-        raise ValueError("{} not defined!".format(atlas_name))
-    if parcel not in ATLAS_METADATA[atlas_name]['parcels']:
-        raise ValueError("atlas-{} does not have map with {} number of parcels.".format(atlas_name, parcel))
-    curr_atlas = ATLAS_METADATA[atlas_name]
-    curr_atlas['atlas'] = atlas_name
+def fetch_atlas_path(atlas_name, template, resolution, description_keywords):
+    """
+    Generate a dictionary containing parameters for TemplateFlow quiery.
 
-    if curr_atlas['source'] == "templateflow":
-        tf_conf.TF_HOME = Path(TEMPLATEFLOW_HOME)
-    else:
-        tf_conf.TF_HOME = Path(curr_atlas['source'])
-    tf_conf.update()
-    tf_conf.init_layout()
+    Parameters
+    ----------
+    atlas_name : str
+        Atlas name. Must be a key in ATLAS_METADATA.
 
-    desc = curr_atlas['description'].format(parcel=parcel)
-    resolution = "02"
-    atlas_path = tflow.get('MNI152NLin2009cAsym',
-                            atlas=atlas_name,
-                            resolution=resolution,
-                            desc=desc,
-                            extension=".nii.gz")
+    template : str
+        TemplateFlow template name.
 
-    label_path = Path(str(atlas_path).replace("nii.gz", "tsv"))
+    resolution : int
+        TemplateFlow template resolution.
 
-    if curr_atlas['type'] == "dseg":
-        masker = NiftiLabelsMasker(
-            str(atlas_path), detrend=True)
-    elif curr_atlas['type'] == "probseg":
-        masker = NiftiMapsMasker(
-            str(atlas_path), detrend=True)
+    description_keywords : dict
+        Keys and values to fill in description_pattern.
+        For valid keys check relevant ATLAS_METADATA[atlas_name]['description_pattern'].
+
+    Return
+    ------
+    sklearn.utils.Bunch
+        Containing the following fields:
+
+        maps : str
+            Path to atlas map.
+
+        labels : pandas.DataFrame
+            The corresponding pandas dataframe of the atlas
+
+        type : str
+            'dseg' (for NiftiLabelsMasker) or 'probseg' (for NiftiMapsMasker)
+    """
+
+    cur_atlas_meta = ATLAS_METADATA[atlas_name].copy()
+
+    if cur_atlas_meta['source'] != "templateflow":
+        templateflow.conf.init_layout()
+
+    img_parameters = generate_templateflow_parameters(cur_atlas_meta, "atlas", resolution, description_keywords)
+    label_parameters = generate_templateflow_parameters(cur_atlas_meta, "label", resolution, description_keywords)
+    img_path = templateflow.api.get(template, raise_empty=True, **img_parameters)
+    img_path = str(img_path)
+    label_path = templateflow.api.get(template, raise_empty=True, **label_parameters)
+
+    labels = pd.read_csv(label_path, delimiter="\t")
+    # labels = (labels['Region'].astype(str) + ". " +
+    #           labels['Difumo_names']).values.tolist()
+    atlas_type = img_path.split('_')[-1].split('.nii.gz')[0]
+    return sklearn.utils.Bunch(maps=img_path, labels=labels, type=atlas_type)
+
+
+def generate_templateflow_parameters(cur_atlas_meta, file_type, resolution, description_keywords):
+    """
+    Generate a dictionary containing parameters for TemplateFlow quiery.
+
+    Parameters
+    ----------
+    cur_atlas_meta : dict
+        The current TemplateFlow competable atlas metadata.
+
+    file_type : str {'atlas', 'label'}
+        Generate parameters to quiry atlas or label.
+
+    resolution : int
+        Templateflow template resolution.
+
+    description_keywords : dict
+        Keys and values to fill in description_pattern.
+        For valid keys check relevant ATLAS_METADATA[atlas_name]['description_pattern'].
+
+    Return
+    ------
+    dict
+        A dictionary containing parameters to pass to a templateflow query.
+    """
+    description = cur_atlas_meta['description_pattern']
+    description = description.format(**description_keywords)
+
+    parameters_ = {key: None for key in cur_atlas_meta[f'{file_type}_parameters']}
+    parameters_.update({'atlas': cur_atlas_meta['atlas'], 'extension': ".nii.gz"})
+    if file_type == 'label':
+        parameters_['extension'] = '.tsv'
+    if parameters_.get('resolution', False) is None:
+        parameters_['resolution'] = resolution
+    if parameters_.get('desc', False) is None:
+        parameters_['desc'] = description
+    return parameters_
+
+
+def create_atlas_masker(atlas_name, description_keywords, template='MNI152NLin2009cAsym', resolution=2, nilearn_cache=""):
+    """Create masker given metadata.
+
+    Parameters
+    ----------
+    atlas_name : str
+        Atlas name. Must be a key in ATLAS_METADATA.
+
+    description_keywords : dict
+        Keys and values to fill in description_pattern.
+        For valid keys check relevant ATLAS_METADATA[atlas_name]['description_pattern'].
+
+    template : str
+        TemplateFlow template name.
+
+    resolution : str
+        TemplateFlow template resolution.
+    """
+    atlas = fetch_atlas_path(atlas_name,
+                             resolution=resolution,
+                             template=template,
+                             description_keywords=description_keywords)
+
+    if atlas.type == 'dseg':
+        masker = nilearn.input_data.NiftiLabelsMasker(atlas.maps, detrend=True)
+    elif atlas.type == 'probseg':
+        masker = nilearn.input_data.NiftiMapsMasker(atlas.maps, detrend=True)
     if nilearn_cache:
         masker = masker.set_params(memory=nilearn_cache, memory_level=1)
-
-    return masker, label_path
+    labels = list(range(1, atlas.labels.shape[0] + 1))
+    return masker, labels
 
 
 def niak2bids(niak_filename):
@@ -220,9 +323,11 @@ if __name__ == '__main__':
             fmri_nii = load_img(str(fmri_path))
             mask_img = compute_brain_mask(fmri_nii, memory=nilearn_cache)
 
-            for parcel in ATLAS_METADATA[atlas_name]['parcels']:
+            for dimension in ATLAS_METADATA[atlas_name]['dimensions']:
                 print("\t" + parcel)
-                masker, label_path = create_atlas_masker(atlas_name, parcel, nilearn_cache)
+                description_keywords = {"dimension": dimension}
+                masker, labels = create_atlas_masker(
+                        atlas_name, description_keywords, template=template, resolution=resolution)
                 output_filename_root = bidsish_timeseries_file_name(
                     file_entitiles)
                 atlas_desc = label_path.name.split('desc-')[-1].split('_')[0]
@@ -232,11 +337,10 @@ if __name__ == '__main__':
                     str(fmri_path))
                 clean_tseries = masker.fit_transform(
                     str(fmri_path), confounds=confounds)
-                labels = pd.read_csv(label_path, sep='\t')
                 for desc, tseries in zip(['raw', 'deconfound'], [raw_tseries, clean_tseries]):
                     output_filename = output_filename_root + \
                         f"atlas-{atlas_name}{atlas_desc}_desc-{desc}_timeseries.tsv"
-                    timeseries = pd.DataFrame(tseries, columns=labels.iloc[:, 0])
+                    timeseries = pd.DataFrame(tseries, columns=labels)
                     timeseries.to_csv(timeseries_output_dir / output_filename, sep='\t', index=False)
         # tar the dataset
         with tarfile.open(output_root_dir / f"{dataset_name}.tar.gz", "w:gz") as tar:
