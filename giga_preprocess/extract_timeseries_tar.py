@@ -25,14 +25,11 @@ from templateflow import api as tflow
 from templateflow import conf as tf_conf
 
 
-DATASETS = ["adni_preprocess", "ccna_preprocess", "cimaq_preprocess",
-            "oasis_preprocess", "preventad_preprocess"]
-
 TEMPLATEFLOW_HOME = "./data/raw/customed_templateflow"
 INPUT_DIR = "/data/cisl/giga_preprocessing/preprocessed_data"
 OUTPUT_ROOT = '/data/cisl/preprocessed_data/giga_timeseries/'
 NIAK_PATTERN = {
-    'adin': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
+    'adni': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
     'ccna': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
     'cimaq': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_(?P<task>[A-Za-z0-9]{,4})_(run(?P<run>[0-9]{1}))?",
     'oasis': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
@@ -323,12 +320,14 @@ if __name__ == '__main__':
 
     print("#### {} ####".format(dataset_dir))
     preprocessed_data_dir = input_dir / dataset_dir / "resample"
-    dataset_name = f"dataset-{dataset}"
-    output_dir = output_root_dir / dataset_name
-    output_dir.mkdir(parents=True, exist_ok=True)
+    print(preprocessed_data_dir)
     fmri_data = preprocessed_data_dir.glob("*.nii.gz")
     fmri_data = list(fmri_data)
     print(fmri_data[0])
+
+    dataset_name = f"dataset-{dataset}"
+    output_dir = output_root_dir / dataset_name
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     for atlas_name in atlas_names:
         print("-- {} --".format(atlas_name))
