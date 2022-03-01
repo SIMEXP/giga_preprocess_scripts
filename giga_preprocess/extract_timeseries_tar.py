@@ -41,7 +41,7 @@ NIAK_CONFOUNDS = ["motion_tx", "motion_ty", "motion_tz",
                   "wm_avg", "vent_avg", "slow_drift"]
 
 ATLAS_METADATA = {
-    'schaefer7': {
+    'schaefer': {
         'source': "templateflow",
         'templates' : ['MNI152NLin2009cAsym', 'MNI152NLin6Asym'],
         'resolutions': [1, 2],
@@ -86,7 +86,7 @@ def get_parser():
 
     parser.add_argument(
         "-a", "--atlas", required=False, default=-1, help=""
-        "Atlas for timeseries extraction. Valid resolutions available are {schaefer7, mist, segmented_difumo}, -1 for all (default: -1)",
+        "Atlas for timeseries extraction. Valid resolutions available are {schaefer, mist, segmented_difumo}, -1 for all (default: -1)",
     )
     return parser
 
@@ -224,11 +224,17 @@ def niak2bids(niak_filename, dataset_name):
 def bidsish_timeseries_file_name(file_entitiles):
     """Create a BIDS-like file name to save extracted timeseries as tsv."""
     base = f"sub-{file_entitiles['sub']}_"
-    if  file_entitiles.get("ses", False) is not None:
-        base += "ses-{file_entitiles['ses']}_"
-    base += "task-{file_entitiles['task']}_"
-    if  file_entitiles.get("run", False) is not None:
-        base += f"run-{file_entitiles['run']}_"
+
+    if file_entitiles.get('ses', False):
+        if file_entitiles.get('ses', False) is not None:
+            base += f"ses-{file_entitiles['ses']}_"
+
+    base += f"task-{file_entitiles['task']}_"
+
+    if file_entitiles.get('run', False):
+        if file_entitiles.get('run', False) is not None:
+            base += f"run-{file_entitiles['run']}_"
+
     return base
 
 
