@@ -65,6 +65,16 @@ ATLAS_METADATA = {
         'atlas_parameters': ['resolution', 'desc'],
         'label_parameters': ['resolution','desc'],
         },
+    "mist": {
+        'source': "user_define",
+        'templates' : ['MNI152NLin2009bSym'],
+        'resolutions': [3],
+        'atlas': 'MIST',
+        'description_pattern': "{dimension}",
+        'dimensions': [7, 12, 20, 36, 64, 122, 197, 325, 444, 'ROI'],
+        'atlas_parameters': ['resolution', 'desc'],
+        'label_parameters': ['resolution','desc'],
+        }
     }
 
 def get_parser():
