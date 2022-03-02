@@ -4,10 +4,7 @@ NIAK timeseries extraction and confound removal.
 Save the output to a hdf5 file.
 
 To do:
-- dataset desceiptions
-- confound variables - descriptions of them
-- store an equivalent to participants.tsv
-- tests for the confounds loader and the motion expansion
+- preventad - MINC data to nifti.
 """
 import argparse
 import re
