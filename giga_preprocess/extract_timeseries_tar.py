@@ -41,6 +41,16 @@ NIAK_CONFOUNDS = ["motion_tx", "motion_ty", "motion_tz",
                   "wm_avg", "vent_avg", "slow_drift"]
 
 ATLAS_METADATA = {
+    'mist': {
+        'source': "user_define",
+        'templates' : ['MNI152NLin2009bSym'],
+        'resolutions': [3],
+        'atlas': 'MIST',
+        'description_pattern': "{dimension}",
+        'dimensions': [7, 12, 20, 36, 64, 122, 197, 325, 444, 'ROI'],
+        'atlas_parameters': ['resolution', 'desc'],
+        'label_parameters': ['resolution','desc'],
+        },
     'schaefer': {
         'source': "templateflow",
         'templates' : ['MNI152NLin2009cAsym', 'MNI152NLin6Asym'],
@@ -61,16 +71,6 @@ ATLAS_METADATA = {
         'atlas_parameters': ['resolution', 'desc'],
         'label_parameters': ['resolution','desc'],
         },
-    'mist': {
-        'source': "user_define",
-        'templates' : ['MNI152NLin2009bSym'],
-        'resolutions': [3],
-        'atlas': 'MIST',
-        'description_pattern': "{dimension}",
-        'dimensions': [7, 12, 20, 36, 64, 122, 197, 325, 444, 'ROI'],
-        'atlas_parameters': ['resolution', 'desc'],
-        'label_parameters': ['resolution','desc'],
-        }
     }
 
 def get_parser():
@@ -318,7 +318,8 @@ if __name__ == '__main__':
     input_dir = Path(INPUT_DIR)
     nilearn_cache = ""
     args = get_parser().parse_args()
-    atlas_names = ATLAS_METADATA.keys() if args.atlas == -1 else [args.atlas]
+    atlas_names = list(ATLAS_METADATA.keys()) if int(args.atlas) == -1 else [args.atlas]
+    print(f"process atlas: {atlas_names}")
     dataset = args.dataset
     dataset_dir = f"{dataset}_preprocess"
     tf_conf.TF_HOME = Path(TEMPLATEFLOW_HOME)
