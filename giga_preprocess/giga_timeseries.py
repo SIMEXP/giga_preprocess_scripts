@@ -1,7 +1,5 @@
 """
-NIAK timeseries extraction and confound removal.
-
-Save the output to a hdf5 file.
+NIAK timeseries extraction and confound removal per subject.
 
 To do:
 - preventad - MINC data to nifti.
@@ -21,19 +19,12 @@ import sklearn
 from templateflow import api as tflow
 from templateflow import conf as tf_conf
 
+from datetime import datetime
+
+
 
 TEMPLATEFLOW_HOME = "./data/raw/customed_templateflow"
-INPUT_DIR = "/data/cisl/giga_preprocessing/preprocessed_data"
-OUTPUT_ROOT = '/data/cisl/preprocessed_data/giga_timeseries/'
-NIAK_PATTERN = {
-    'adni': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
-    'ccna': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
-    'cimaq': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_(?P<task>rest|memory)_(run(?P<run>[0-9]{1}))?",
-    'oasis': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
-    'preventad': r"fmri_sub(?P<sub>[A-Za-z0-9]*)_sess(?P<ses>[A-Za-z0-9]*)_task(?P<task>[A-Za-z0-9]{,4})(run(?P<run>[0-9]{2}))?",
-}
-
-# GIGA_PATTERN = r"fmri_s(ub)?(?P<sub>[A-Za-z0-9]*)_(sess(?P<ses>[A-Za-z0-9]*))?(_task)?(?P<task>rest|memory|FU[0-9]*|BL[0-9]*)(_)?(run(?P<run>[0-9]{,3}))?"
+GIGA_PATTERN = r"fmri_s(ub)?(?P<sub>[A-Za-z0-9]*)_(sess(?P<ses>[A-Za-z0-9]*))?(_task)?(?P<task>rest|memory|FU[0-9]*|BL[0-9]*)(_)?(run(?P<run>[0-9]{,3}))?"
 
 NIAK_CONFOUNDS = ["motion_tx", "motion_ty", "motion_tz",
                   "motion_rx", "motion_ry", "motion_rz",
@@ -75,17 +66,28 @@ ATLAS_METADATA = {
 def get_parser():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter, description="", epilog="""
-    Timeseries extraction on giga processing datasets.
+    Timeseries extraction on a preprocessed file from giga processing datasets.
     """)
-
+    parser.add_argument(
+        "-i", "--input", required=True, help=""
+        "NIAK giga processing dataset root.",
+    )
     parser.add_argument(
         "-d", "--dataset", required=True, help=""
-        "NIAK giga processing dataset {adni, ccna, cimaq, oasis, preventad}",
+        "NIAK giga processing dataset name {adni, ccna, cimaq, oasis, preventad}",
     )
-
     parser.add_argument(
-        "-a", "--atlas", required=False, default=-1, help=""
-        "Atlas for timeseries extraction. Valid resolutions available are {schaefer, mist, segmented_difumo}, -1 for all (default: -1)",
+        "-s", "--scan", required=True, help=""
+        "File name of a preprocessed scan from the dedicated NIAK giga process dataset {adni, ccna, cimaq, oasis, preventad}",
+    )
+    parser.add_argument(
+        "-o", "--output", required=True, help=""
+        "Output path root.",
+    )
+    parser.add_argument(
+        "-a", "--atlas", required=False, default=-1, help="""
+        Atlas for timeseries extraction. Valid resolutions available are {schaefer, mist, segmented_difumo}, -1 for all (default: -1).
+        When specific atlas is requested, the output directory and tar file will be suffixed with the name of the atlas.""",
     )
     return parser
 
@@ -216,8 +218,7 @@ def create_atlas_masker(atlas_name, description_keywords, template='MNI152NLin20
 def niak2bids(niak_filename, dataset_name):
     """Parse niak file name to BIDS entities."""
     print("\t" + niak_filename)
-    compile_name = re.compile(NIAK_PATTERN[dataset_name])
-    # compile_name = re.compile(GIGA_PATTERN)
+    compile_name = re.compile(GIGA_PATTERN)
     return compile_name.search(niak_filename).groupdict()
 
 
@@ -319,29 +320,55 @@ def create_timeseries_root_dir(output_dir, file_entitiles):
     return timeseries_root_dir
 
 
-if __name__ == '__main__':
+def log_time():
+    now = datetime.now()
+    return now.strftime("%H:%M:%S")
 
-    output_root_dir = Path(OUTPUT_ROOT)
-    input_dir = Path(INPUT_DIR)
+
+def main():
     nilearn_cache = ""
     args = get_parser().parse_args()
-    atlas_names = list(ATLAS_METADATA.keys()) if int(args.atlas) == -1 else [args.atlas]
-    print(f"process atlas: {atlas_names}")
+
     dataset = args.dataset
+    scanfile = args.scan
     dataset_dir = f"{dataset}_preprocess"
+
+    output_root_dir = Path(args.output)
+    input_dir = Path(args.input)
+
     tf_conf.TF_HOME = Path(TEMPLATEFLOW_HOME)
     tf_conf.update(local=True)
 
+    log_time()
     print("#### {} ####".format(dataset_dir))
     preprocessed_data_dir = input_dir / dataset_dir / "resample"
-    print(preprocessed_data_dir)
-    fmri_data = preprocessed_data_dir.glob("*.nii.gz")
-    fmri_data = list(fmri_data)
-    print(fmri_data[0])
+    fmri_path = preprocessed_data_dir / scanfile
+    if fmri_path.exists():
+        print(fmri_path)
+    else:
+        print(f"File not found: {fmri_path}")
+        return -1
+
+    atlas_names = list(ATLAS_METADATA.keys()) if isinstance(args.atlas, int) else [args.atlas]
+    print(f"process atlas: {atlas_names}")
 
     dataset_name = f"dataset-{dataset}"
+
     output_dir = output_root_dir / dataset_name
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    file_entitiles = niak2bids(fmri_path.name, dataset)
+    confounds = load_niak_confounds(fmri_path)
+    if isinstance(confounds, int):
+        print("Confounds cannot be loaded correctly.")
+        return confounds
+
+    timeseries_output_dir = create_timeseries_root_dir(output_dir,
+        file_entitiles)
+    fmri_nii = load_img(str(fmri_path))
+    mask_img = compute_brain_mask(fmri_nii, memory=nilearn_cache)
+    output_filename_root = bidsish_timeseries_file_name(
+                    file_entitiles)
 
     for atlas_name in atlas_names:
         print("-- {} --".format(atlas_name))
@@ -353,23 +380,18 @@ if __name__ == '__main__':
             template = "MNI152NLin2009cAsym"
             resolution = 2
 
-        for fmri_path in fmri_data:
-            file_entitiles = niak2bids(fmri_path.name, dataset)
-            confounds = load_niak_confounds(fmri_path)
-            if isinstance(confounds, int):
-                continue
-            timeseries_output_dir = create_timeseries_root_dir(output_dir,
-                file_entitiles)
-            fmri_nii = load_img(str(fmri_path))
-            mask_img = compute_brain_mask(fmri_nii, memory=nilearn_cache)
+        for dimension in ATLAS_METADATA[atlas_name]['dimensions']:
+            # check if 3 files exists
+            description_keywords = {"dimension": dimension}
+            masker, labels, atlas_desc = create_atlas_masker(
+                    atlas_name, description_keywords, template=template, resolution=resolution)
 
-            for dimension in ATLAS_METADATA[atlas_name]['dimensions']:
-                print(f"\t{dimension}")
-                description_keywords = {"dimension": dimension}
-                masker, labels, atlas_desc = create_atlas_masker(
-                        atlas_name, description_keywords, template=template, resolution=resolution)
-                output_filename_root = bidsish_timeseries_file_name(
-                    file_entitiles)
+            processed = list(timeseries_output_dir.glob(f"{output_filename_root}atlas-{atlas_name}{atlas_desc}_desc-*.tsv"))
+            if len(processed) == 3:
+                print(f'{dimension}\tfiles exist; skipped.')
+            else:
+                now = log_time()
+                print(f'{dimension}\t{now}')
                 masker.set_params(mask_img=mask_img)
                 raw_tseries = masker.fit_transform(
                     str(fmri_path))
@@ -386,10 +408,14 @@ if __name__ == '__main__':
                 connectome.to_csv(
                     timeseries_output_dir / output_filename.replace("timeseries", "connectome"),
                     sep='\t')
-        # tar the dataset
-        with tarfile.open(output_root_dir / f"{dataset_name}.tar.gz", "w:gz") as tar:
-            tar.add(output_dir, arcname=output_dir.name)
+    now = log_time()
+    print(f'finished\t{now}')
+    return 0
 
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())
 
 # run tests:
 # pytest extract_timeseries.py
