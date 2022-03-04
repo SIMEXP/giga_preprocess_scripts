@@ -12,9 +12,9 @@ echo "get all processes to be checked"
 
 for dataset in $datasets; do
     files=$(ls $GIGA_DIR/${dataset}_preprocess/resample/fmri*.nii.gz);
-    for f in $files; do
-        file_basename=$(basename $f);
-        for a in schaefer mist segmented_difumo; do
+    for a in mist segmented_difumo schaefer; do
+        for f in $files; do
+            file_basename=$(basename $f);
             echo -e "$dataset\t$file_basename\t$a" >> all_jobs.tsv
         done;
     done;
@@ -25,10 +25,12 @@ split -d -l 400 all_jobs.tsv batch_
 
 echo "Created batch files"
 
-for i in $(seq -f "%02g" 0 39); do
+for i in $(seq 0 39); do
+    printf -v j "%02d" $i
+    i=$((i+1))
+    echo $i
     while read -r line; do
         IFS=$'\t' read dataset file_basename atlas <<< $line
-        echo $line
-        python giga_preprocess/giga_timeseries.py -i $GIGA_DIR -d $dataset -s $file_basename -o $OUTPUT_ROOT -a $atlas 
-    done < batch_$i > logs/batch_$i.log &
+        taskset --cpu-list $i python giga_preprocess/giga_timeseries.py -i $GIGA_DIR -d $dataset -s $file_basename -o $OUTPUT_ROOT -a $atlas 
+    done < batch_$j > logs/batch_$j.log &
 done

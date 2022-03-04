@@ -128,15 +128,14 @@ def fetch_atlas_path(atlas_name, template, resolution, description_keywords):
 
     cur_atlas_meta = ATLAS_METADATA[atlas_name].copy()
 
-    if cur_atlas_meta['source'] != "templateflow":
-        tf_conf.init_layout()
+    if cur_atlas_meta['source'] =='user_define':
+        tf_conf.update()
 
     img_parameters = generate_templateflow_parameters(cur_atlas_meta, "atlas", resolution, description_keywords)
     label_parameters = generate_templateflow_parameters(cur_atlas_meta, "label", resolution, description_keywords)
-    img_path = tflow.get(template, raise_empty=True, **img_parameters)
+    img_path = tflow.get(template, **img_parameters)
     img_path = str(img_path)
-    label_path = tflow.get(template, raise_empty=True, **label_parameters)
-
+    label_path = tflow.get(template, **label_parameters)
     labels = pd.read_csv(label_path, delimiter="\t")
     atlas_type = img_path.split('_')[-1].split('.nii.gz')[0]
     return sklearn.utils.Bunch(maps=img_path, labels=labels, type=atlas_type)
@@ -337,7 +336,6 @@ def main():
     input_dir = Path(args.input)
 
     tf_conf.TF_HOME = Path(TEMPLATEFLOW_HOME)
-    tf_conf.update(local=True)
 
     log_time()
     print("#### {} ####".format(dataset_dir))
