@@ -5,32 +5,36 @@ datasets='adni ccna cimaq oasis'
 cd ~/simexp/hwang/giga_preprocess_scripts
 source env/bin/activate
 
-rm batch_*
-rm all_jobs.tsv
-
 echo "get all processes to be checked"
 
-for dataset in $datasets; do
-    files=$(ls $GIGA_DIR/${dataset}_preprocess/resample/fmri*.nii.gz);
-    for a in mist segmented_difumo schaefer; do
-        for f in $files; do
-            file_basename=$(basename $f);
-            echo -e "$dataset\t$file_basename\t$a" >> all_jobs.tsv
-        done;
-    done;
-done
+# for dataset in $datasets; do
+#     files=$(ls $GIGA_DIR/${dataset}_preprocess/resample/fmri*.nii.gz);
+#     for f in $files; do
+#         file_basename=$(basename $f);
+#         echo -e "$dataset\t$file_basename" >> all_files.tsv
+#     done;
+# done
 
-# split to 40 batches; 400 processes max each batch
-split -d -l 400 all_jobs.tsv batch_ 
+# split -d -l 200 all_files.tsv batch_files/batch_ 
+# split -d -l 300 all_files.tsv batch_files/difumo_batch_ 
 
 echo "Created batch files"
 
-for i in $(seq 0 39); do
+for i in $(seq 0 26); do
     printf -v j "%02d" $i
     i=$((i+1))
     echo $i
     while read -r line; do
         IFS=$'\t' read dataset file_basename atlas <<< $line
-        taskset --cpu-list $i python giga_preprocess/giga_timeseries.py -i $GIGA_DIR -d $dataset -s $file_basename -o $OUTPUT_ROOT -a $atlas 
-    done < batch_$j > logs/batch_$j.log &
+        taskset --cpu-list $i python giga_preprocess/giga_timeseries.py -i $GIGA_DIR -d $dataset -s $file_basename -o $OUTPUT_ROOT -a mist 
+        taskset --cpu-list $i python giga_preprocess/giga_timeseries.py -i $GIGA_DIR -d $dataset -s $file_basename -o $OUTPUT_ROOT -a schaefer
+    done < batch_files/batch_$j > logs/subject_batch_$j.log &
+done
+
+for i in $(seq 0 5); do
+    printf -v j "%02d" $i
+    while read -r line; do
+        IFS=$'\t' read dataset file_basename atlas <<< $line
+        taskset --cpu-list 3$i python giga_preprocess/giga_timeseries.py -i $GIGA_DIR -d $dataset -s $file_basename -o $OUTPUT_ROOT -a segmented_difumo 
+    done < batch_files/difumo_batch_$j > logs/difumo_batch_$j.log &
 done

@@ -31,16 +31,6 @@ NIAK_CONFOUNDS = ["motion_tx", "motion_ty", "motion_tz",
                   "wm_avg", "vent_avg", "slow_drift"]
 
 ATLAS_METADATA = {
-    'mist': {
-        'source': "user_define",
-        'templates' : ['MNI152NLin2009bSym'],
-        'resolutions': [3],
-        'atlas': 'MIST',
-        'description_pattern': "{dimension}",
-        'dimensions': [7, 12, 20, 36, 64, 122, 197, 325, 444, 'ROI'],
-        'atlas_parameters': ['resolution', 'desc'],
-        'label_parameters': ['resolution','desc'],
-        },
     'schaefer': {
         'source': "templateflow",
         'templates' : ['MNI152NLin2009cAsym', 'MNI152NLin6Asym'],
@@ -50,6 +40,16 @@ ATLAS_METADATA = {
         'dimensions': [100, 200, 300, 400, 500, 600, 800, 1000],
         'atlas_parameters': ['resolution', 'desc'],
         'label_parameters': ['desc'],
+        },
+    'mist': {
+        'source': "user_define",
+        'templates' : ['MNI152NLin2009bSym'],
+        'resolutions': [3],
+        'atlas': 'MIST',
+        'description_pattern': "{dimension}",
+        'dimensions': [7, 12, 20, 36, 64, 122, 197, 325, 444, 'ROI'],
+        'atlas_parameters': ['resolution', 'desc'],
+        'label_parameters': ['resolution','desc'],
         },
     'segmented_difumo': {
         'source': "user_define",
@@ -129,7 +129,13 @@ def fetch_atlas_path(atlas_name, template, resolution, description_keywords):
     cur_atlas_meta = ATLAS_METADATA[atlas_name].copy()
 
     if cur_atlas_meta['source'] =='user_define':
-        tf_conf.update()
+        tf_conf.TF_HOME = Path(TEMPLATEFLOW_HOME)
+        tf_conf.update(local=True)
+        tf_conf.init_layout()
+    else:
+        tf_conf.TF_HOME = tf_conf.TF_DEFAULT_HOME
+        tf_conf.update(overwrite=False, silent=True)
+        tf_conf.init_layout()
 
     img_parameters = generate_templateflow_parameters(cur_atlas_meta, "atlas", resolution, description_keywords)
     label_parameters = generate_templateflow_parameters(cur_atlas_meta, "label", resolution, description_keywords)
@@ -334,8 +340,6 @@ def main():
 
     output_root_dir = Path(args.output)
     input_dir = Path(args.input)
-
-    tf_conf.TF_HOME = Path(TEMPLATEFLOW_HOME)
 
     log_time()
     print("#### {} ####".format(dataset_dir))
