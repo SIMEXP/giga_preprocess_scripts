@@ -186,28 +186,13 @@ def generate_templateflow_parameters(cur_atlas_meta, file_type, resolution, desc
 
 
 def create_atlas_masker(atlas, nilearn_cache=""):
-    """Create masker given metadata.
+    """Create masker given atlas information.
 
     Parameters
     ----------
-    atlas_name : str
-        Atlas name. Must be a key in ATLAS_METADATA.
-
-    description_keywords : dict
-        Keys and values to fill in description_pattern.
-        For valid keys check relevant ATLAS_METADATA[atlas_name]['description_pattern'].
-
-    template : str
-        TemplateFlow template name.
-
-    resolution : str
-        TemplateFlow template resolution.
+    atlas : sklearn.utils.Bunch
+        Atlas information generated from `fetch_atlas_path`.
     """
-    # atlas = fetch_atlas_path(atlas_name,
-    #                          resolution=resolution,
-    #                          template=template,
-    #                          description_keywords=description_keywords)
-
     if atlas.type == 'dseg':
         masker = NiftiLabelsMasker(atlas.maps, detrend=True)
     elif atlas.type == 'probseg':
@@ -380,36 +365,40 @@ def main():
             resolution = 2
 
         for dimension in ATLAS_METADATA[atlas_name]['dimensions']:
-            # check if 3 files exists
+            # get atlas info
             description_keywords = {"dimension": dimension}
             atlas = fetch_atlas_path(atlas_name,
-                            resolution=resolution,
-                            template=template,
-                            description_keywords=description_keywords)
+                                     resolution=resolution,
+                                     template=template,
+                                     description_keywords=description_keywords)
             atlas_desc = atlas.maps.split('desc-')[-1].split('_')[0]
-            processed = list(timeseries_output_dir.glob(f"{output_filename_root}atlas-{atlas_name}{atlas_desc}_desc-*.tsv"))
-            if len(processed) == 3:
+
+            # check if 3 files exists
+            check_processed = list(timeseries_output_dir.glob(f"{output_filename_root}atlas-{atlas_name}{atlas_desc}_desc-*.tsv"))
+            if len(check_processed) == 3:
                 print(f'{dimension}\tfiles exist; skipped.')
-            else:
-                now = log_time()
-                masker, labels = create_atlas_masker(atlas, nilearn_cache="")
-                print(f'{dimension}\t{now}')
-                masker.set_params(mask_img=mask_img)
-                raw_tseries = masker.fit_transform(
-                    str(fmri_path))
-                clean_tseries = masker.fit_transform(
-                    str(fmri_path), confounds=confounds)
-                for desc, tseries in zip(['raw', 'deconfound'], [raw_tseries, clean_tseries]):
-                    output_filename = output_filename_root + \
-                        f"atlas-{atlas_name}{atlas_desc}_desc-{desc}_timeseries.tsv"
-                    timeseries = pd.DataFrame(tseries, columns=labels)
-                    timeseries.to_csv(timeseries_output_dir / output_filename, sep='\t', index=False)
-                corr_measure = ConnectivityMeasure(kind="correlation")
-                connectome = corr_measure.fit_transform([clean_tseries])[0]
-                connectome = pd.DataFrame(connectome, columns=labels, index=labels)
-                connectome.to_csv(
-                    timeseries_output_dir / output_filename.replace("timeseries", "connectome"),
-                    sep='\t')
+                continue
+
+            # process the data
+            now = log_time()
+            masker, labels = create_atlas_masker(atlas, nilearn_cache="")
+            print(f'{dimension}\t{now}')
+            masker.set_params(mask_img=mask_img)
+            raw_tseries = masker.fit_transform(
+                str(fmri_path))
+            clean_tseries = masker.fit_transform(
+                str(fmri_path), confounds=confounds)
+            for desc, tseries in zip(['raw', 'deconfound'], [raw_tseries, clean_tseries]):
+                output_filename = output_filename_root + \
+                    f"atlas-{atlas_name}{atlas_desc}_desc-{desc}_timeseries.tsv"
+                timeseries = pd.DataFrame(tseries, columns=labels)
+                timeseries.to_csv(timeseries_output_dir / output_filename, sep='\t', index=False)
+            corr_measure = ConnectivityMeasure(kind="correlation")
+            connectome = corr_measure.fit_transform([clean_tseries])[0]
+            connectome = pd.DataFrame(connectome, columns=labels, index=labels)
+            connectome.to_csv(
+                timeseries_output_dir / output_filename.replace("timeseries", "connectome"),
+                sep='\t')
     now = log_time()
     print(f'finished\t{now}')
     return 0
