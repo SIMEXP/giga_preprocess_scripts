@@ -185,7 +185,7 @@ def generate_templateflow_parameters(cur_atlas_meta, file_type, resolution, desc
     return parameters_
 
 
-def create_atlas_masker(atlas_name, description_keywords, template='MNI152NLin2009cAsym', resolution=2, nilearn_cache=""):
+def create_atlas_masker(atlas, nilearn_cache=""):
     """Create masker given metadata.
 
     Parameters
@@ -203,12 +203,10 @@ def create_atlas_masker(atlas_name, description_keywords, template='MNI152NLin20
     resolution : str
         TemplateFlow template resolution.
     """
-    atlas = fetch_atlas_path(atlas_name,
-                             resolution=resolution,
-                             template=template,
-                             description_keywords=description_keywords)
-
-    atlas_desc = atlas.maps.split('desc-')[-1].split('_')[0]
+    # atlas = fetch_atlas_path(atlas_name,
+    #                          resolution=resolution,
+    #                          template=template,
+    #                          description_keywords=description_keywords)
 
     if atlas.type == 'dseg':
         masker = NiftiLabelsMasker(atlas.maps, detrend=True)
@@ -217,7 +215,7 @@ def create_atlas_masker(atlas_name, description_keywords, template='MNI152NLin20
     if nilearn_cache:
         masker = masker.set_params(memory=nilearn_cache, memory_level=1)
     labels = list(range(1, atlas.labels.shape[0] + 1))
-    return masker, labels, atlas_desc
+    return masker, labels
 
 
 def niak2bids(niak_filename, dataset_name):
@@ -272,18 +270,18 @@ def temporal_derivatives(data):
 def load_niak_confounds(fmri_path):
     "Load full expansion of motion, basic tissue, slow drift."
     confounds_path = str(fmri_path).replace(".nii", "_confounds.tsv")
-    if Path(confounds_path).exists():
-        confounds = pd.read_csv(confounds_path, sep="\t",
-                                compression="gzip")
-    else:
+    if not Path(confounds_path).exists():
         print("{} does not exists, skipping!".format(confounds_path))
         return -1
-
-    # make sure all fields exist
-    if confounds.columns.isin(NIAK_CONFOUNDS).all():
+    confounds = pd.read_csv(confounds_path, sep="\t",
+                            compression="gzip")
+    # make sure all fields exist in confound files
+    if not pd.Series(NIAK_CONFOUNDS).isin(confounds.columns).all():
+        print("Missing columns; skipping!\n{}".format(confounds.columns))
         return -1
-    else:
-        confounds = confounds[NIAK_CONFOUNDS]
+
+    # reduce the confounds
+    confounds = confounds[NIAK_CONFOUNDS]
 
     # add temporal derivatives
     motion_deriv = []
@@ -304,7 +302,6 @@ def load_niak_confounds(fmri_path):
     # Replace them by estimates at second time point,
     mask_nan = np.isnan(confounds.values[0, :])
     confounds.iloc[0, mask_nan] = confounds.iloc[1, mask_nan]
-
     return confounds
 
 
@@ -385,14 +382,17 @@ def main():
         for dimension in ATLAS_METADATA[atlas_name]['dimensions']:
             # check if 3 files exists
             description_keywords = {"dimension": dimension}
-            masker, labels, atlas_desc = create_atlas_masker(
-                    atlas_name, description_keywords, template=template, resolution=resolution)
-
+            atlas = fetch_atlas_path(atlas_name,
+                            resolution=resolution,
+                            template=template,
+                            description_keywords=description_keywords)
+            atlas_desc = atlas.maps.split('desc-')[-1].split('_')[0]
             processed = list(timeseries_output_dir.glob(f"{output_filename_root}atlas-{atlas_name}{atlas_desc}_desc-*.tsv"))
             if len(processed) == 3:
                 print(f'{dimension}\tfiles exist; skipped.')
             else:
                 now = log_time()
+                masker, labels = create_atlas_masker(atlas, nilearn_cache="")
                 print(f'{dimension}\t{now}')
                 masker.set_params(mask_img=mask_img)
                 raw_tseries = masker.fit_transform(

@@ -1,6 +1,0 @@
-[submodule "mist2templateflow"]
-	path = mist2templateflow
-	url = git@github.com:SIMEXP/mist2templateflow.git
-[submodule "difumo_segmentation"]
-	path = difumo_segmentation
-	url = git@github.com:SIMEXP/difumo_segmentation.git
