@@ -16,8 +16,6 @@ echo "get all processes to be checked"
 #     done;
 # done
 
-split -d -l 120 all_files.tsv batch_files/batch_ 
-
 echo "Created batch files"
 
 split -d -l 200 all_files.tsv batch_files/difumo_batch_ 
