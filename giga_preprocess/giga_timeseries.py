@@ -415,7 +415,11 @@ def test_niak2bids():
     case_1 = "fmri_sub130S5006_sess20121114_taskrestrun01_n.nii.gz"
     case_2 = "fmri_sub130S5006_sess20121114_taskrest_n.nii.gz"
     case_cimaq = "fmri_sub164965_rest_run1_n.nii.gz"
+    case_adhd200 = "fmri_subx0027040_session1_rest_n.nii.gz"
+    case_schizo = "fmri_SZ0040143_session1_run1_n.nii.gz"
     assert niak2bids(case_1, 'adin').get("run", False) == "01"
     assert niak2bids(case_2, 'adin').get("run", False) is None
     assert niak2bids(case_cimaq, 'cimaq').get("run", False) == "1"
     assert niak2bids(case_cimaq, 'cimaq').get("ses", False) is False
+    assert niak2bids(case_adhd200, 'adhd200').get("task", False) == "rest"
+    assert niak2bids(case_schizo, 'sz').get("task", False) is False
