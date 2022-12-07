@@ -24,7 +24,7 @@ from datetime import datetime
 
 
 TEMPLATEFLOW_HOME = "./data/raw/customed_templateflow"
-GIGA_PATTERN = r"fmri_s(ub)?(?P<sub>[A-Za-z0-9]*)_(sess(?P<ses>[A-Za-z0-9]*))?(_task)?(?P<task>rest|memory|FU[0-9]*|BL[0-9]*)(_)?(run(?P<run>[0-9]{,3}))?"
+GIGA_PATTERN = r"fmri_(sub)?(?P<sub>[A-Za-z0-9]*)_(sess(ion)?(?P<ses>[A-Za-z0-9]*))?_((task)?(?P<task>rest|memory|FU[0-9]*|BL[0-9]*)?(_)?(run(?P<run>[0-9]{,3}))?)"
 
 NIAK_CONFOUNDS = ["motion_tx", "motion_ty", "motion_tz",
                   "motion_rx", "motion_ry", "motion_rz",
